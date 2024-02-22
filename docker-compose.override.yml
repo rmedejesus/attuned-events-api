@@ -1,0 +1,25 @@
+version: '3.4'
+
+services:
+  mongodb:
+    container_name: attunedDB
+    restart: always
+    volumes:
+        - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+        - "27017:27017"
+
+  attuned-events-api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_HTTPS_PORTS=8081
+      - "AttunedDatabaseSettings:ConnectionString=mongodb://host.docker.internal:27017"
+    ports:
+      - "8080"
+      - "8081"
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+    depends_on:
+        - mongodb

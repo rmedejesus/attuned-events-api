@@ -1,0 +1,11 @@
+version: '3.4'
+
+services:
+  mongodb:
+    image: mongo
+
+  attuned-events-api:
+    image: ${DOCKER_REGISTRY-}attunedeventsapi
+    build:
+      context: .
+      dockerfile: attuned-events-api/Dockerfile
