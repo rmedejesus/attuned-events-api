@@ -22,7 +22,7 @@ namespace attuned_events_api.Helpers
             ReservationResource createdResource = new ReservationResource()
             {
                 Event = _autoMapper.Map<EventResource>(updatedEvent),
-                Message = "Event reservation successfully updated."
+                Message = "Event reservation successfully created."
             };
 
             createdResource.ReservationId = reservationId.ToString();

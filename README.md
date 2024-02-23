@@ -17,7 +17,7 @@ The application and code structure is built within an MVC (Model-View-Controller
 **1. Via Docker**
 - from the root folder, open the CMD or Command Prompt 
 - run the command line `docker compose up --build -d` to build the docker images and containers for the API and database services.
-- after it has successfully built the services, run `docker ps` to check the running services and their currently assigned ports. To check the current running port for the API, the image name is `attunedeventsapi` and the working port assignment is on the `8080/tcp`
+- after it has successfully built the services, run `docker ps` to check the running services and their currently assigned ports. To check the current running port for the API, the image name is `attunedeventsapi`.
 - there are two ways to test the API endpoints, the first one is done by curling to `http://localhost:<port>/swagger/index.html` and test the several endpoints from the UI given by the swagger documentation. The second one is to use the endpoint URLs via Postman.
 
 **2. Via Visual Studio 2022 IDE**
