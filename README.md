@@ -32,8 +32,8 @@ If you have the MongoDB Compass GUI, you can check for the created database `att
 The API endpoints have the following structure:
 - `GET http://localhost:<port>/events` this is the endpoint for getting the list of events and their currently available tickets.
 - `POST http://localhost:<port>/events/{eventId}/reservations` this is the endpoint for creating a new ticket reservation for a specific event.
-- `PATCH http://localhost:5068/events/{eventId}/reservations/{reservationId}` this is the endpoint for updating your current ticket reservation for a specific event.
-- `DELETE http://localhost:5068/events/{eventId}/reservations/{reservationId}` this is the endpoint for deleting a reservation for a specific event.
+- `PATCH http://localhost:<port>/events/{eventId}/reservations/{reservationId}` this is the endpoint for updating your current ticket reservation for a specific event.
+- `DELETE http://localhost:<port>/events/{eventId}/reservations/{reservationId}` this is the endpoint for deleting a reservation for a specific event.
 
 To be able to get the corresponding `{eventId}`, we could check the `eventId` property from the JSON response body from the `GET` request, or by going to the MongoDB Compass GUI and connect to `mongodb://host.docker.internal:27017/` to check the data. The `{reservationId}` is being return on the JSON response body after we have successfully created, updated, or deleted a reservation entity. Alternatively, we could also check the reservation data through the MongoDB Compass GUI.
 
