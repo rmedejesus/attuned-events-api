@@ -1,4 +1,5 @@
 ﻿using attuned_events_api.Config;
+using attuned_events_api.Helpers;
 using attuned_events_api.Models;
 using attuned_events_api.RequestParamModels;
 using attuned_events_api.ViewModels;
@@ -22,7 +23,7 @@ namespace attuned_events_api.Services
         private readonly IMongoCollection<Reservation> _reservationCollection;
         private readonly IMongoDatabase db;
         private readonly MongoClient _client;
-        private readonly Mapper _autoMapper;
+        private readonly ReservationResourceHelper _resourceHelper;
 
         public DeleteEventReservationRequestHandler(IOptions<DBSettings> dbSettings)
         {
@@ -30,7 +31,7 @@ namespace attuned_events_api.Services
             db = _client.GetDatabase(dbSettings.Value.DatabaseName);
             _eventCollection = db.GetCollection<Event>(MongoCollectionName.Events);
             _reservationCollection = db.GetCollection<Reservation>(MongoCollectionName.Reservations);
-            _autoMapper = AutoMapperConfig.InitializeAutoMapper();
+            _resourceHelper = new ReservationResourceHelper();
         }
 
         public async Task<ReservationResource> Handle(DeleteEventReservationRequest request, CancellationToken cancellationToken)
@@ -39,28 +40,17 @@ namespace attuned_events_api.Services
 
             if (hostedEvent is null)
             {
-                ReservationResource error = new ReservationResource()
-                {
-                    Message = "Unable to update reservation for the event."
-                };
-
-                error.Cause = "Event does not exist.";
-
-                return await Task.Run(() => error);
+                ReservationResource error = _resourceHelper.CreateEventDoesNotExistResource();
+                return error;
             }
 
             Reservation currentReservation = await _reservationCollection.Find(Builders<Reservation>.Filter.Eq(e => e.ReservationId, request.ReservationId)).FirstOrDefaultAsync();
 
             if (currentReservation is null)
             {
-                ReservationResource error = new ReservationResource()
-                {
-                    Message = "Unable to update reservation for the event."
-                };
+                ReservationResource error = _resourceHelper.CreateReservationDoesNotExistResource();
 
-                error.Cause = "Reservation does not exist.";
-
-                return await Task.Run(() => error);
+                return error;
             }
 
             await _eventCollection.UpdateOneAsync(
@@ -71,13 +61,7 @@ namespace attuned_events_api.Services
 
             Event updatedEvent = await _eventCollection.Find(Builders<Event>.Filter.Eq(e => e.EventId, request.EventId)).FirstOrDefaultAsync();
 
-            ReservationResource createdResource = new ReservationResource()
-            {
-                Event = _autoMapper.Map<EventResource>(updatedEvent),
-                Message = "Event reservation successfully deleted."
-            };
-
-            createdResource.ReservationId = request.ReservationId.ToString();
+            ReservationResource createdResource = _resourceHelper.CreateReservationDeletedResource(request.ReservationId, updatedEvent);
 
             return createdResource;
         }

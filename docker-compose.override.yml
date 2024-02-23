@@ -16,7 +16,6 @@ services:
       - "AttunedDatabaseSettings:ConnectionString=mongodb://host.docker.internal:27017"
     ports:
       - "8080"
-      - "8081"
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/ASP.NET/Http:/home/app/.aspnet/http:ro

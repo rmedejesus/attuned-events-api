@@ -1,4 +1,5 @@
 ﻿using attuned_events_api.Config;
+using attuned_events_api.Helpers;
 using attuned_events_api.Models;
 using attuned_events_api.RequestParamModels;
 using attuned_events_api.ViewModels;
@@ -23,7 +24,7 @@ namespace attuned_events_api.Services
         private readonly IMongoCollection<Reservation> _reservationCollection;
         private readonly IMongoDatabase db;
         private readonly MongoClient _client;
-        private readonly Mapper _autoMapper;
+        private readonly ReservationResourceHelper _resourceHelper;
 
         public CreateEventReservationRequestHandler(IOptions<DBSettings> dbSettings)
         {
@@ -31,40 +32,24 @@ namespace attuned_events_api.Services
             db = _client.GetDatabase(dbSettings.Value.DatabaseName);
             _eventCollection = db.GetCollection<Event>(MongoCollectionName.Events);
             _reservationCollection = db.GetCollection<Reservation>(MongoCollectionName.Reservations);
-            _autoMapper = AutoMapperConfig.InitializeAutoMapper();
+            _resourceHelper = new ReservationResourceHelper();
         }
 
         public async Task<ReservationResource> Handle(CreateEventReservationRequest request, CancellationToken cancellationToken)
         {
             Event hostedEvent = await _eventCollection.Find(Builders<Event>.Filter.Eq(e => e.EventId, request.EventId)).FirstOrDefaultAsync();
 
-            EventResource resource = _autoMapper.Map<EventResource>(hostedEvent);
-
             if (request.Parameters.ReservationAmount > hostedEvent.Availability)
             {
-                ReservationResource error = new ReservationResource()
-                { 
-                    Event = resource,
-                    Message = "Unable to create reservation for the event."
-                };
+                ReservationResource error = _resourceHelper.CreateReservationAmountExceedsResource(hostedEvent, request.Parameters.ReservationAmount);
 
-                error.Cause = "The amount of reservations exceed the amount of tickets available.";
-                error.ReservationAmount = request.Parameters.ReservationAmount;
-
-                return await Task.Run(() => error);
+                return error;
             }
             else if (request.Parameters.ReservationAmount <= 0)
             {
-                ReservationResource error = new ReservationResource()
-                {
-                    Event = resource,
-                    Message = "Unable to create reservation for the event."
-                };
+                ReservationResource error = _resourceHelper.CreateReservationAmountIsZeroOrNegativeResource(hostedEvent, request.Parameters.ReservationAmount);
 
-                error.Cause = "Cannot create reservation having an amount of 0 or less.";
-                error.ReservationAmount = request.Parameters.ReservationAmount;
-
-                return await Task.Run(() => error);
+                return error;
             }
 
             ObjectId reservationId = ObjectId.GenerateNewId();
@@ -83,16 +68,8 @@ namespace attuned_events_api.Services
             await _reservationCollection.InsertOneAsync(reservation);
 
             Event updatedEvent = await _eventCollection.Find(Builders<Event>.Filter.Eq(e => e.EventId, request.EventId)).FirstOrDefaultAsync();
-            Reservation createdReservation = await _reservationCollection.Find(Builders<Reservation>.Filter.Eq(e => e.ReservationId, request.EventId)).FirstOrDefaultAsync();
 
-            ReservationResource createdResource = new ReservationResource()
-            {
-                Event = _autoMapper.Map<EventResource>(updatedEvent),
-                Message = "Event reservation successfully created."
-            };
-
-            createdResource.ReservationId = reservationId.ToString();
-            createdResource.ReservationAmount = request.Parameters.ReservationAmount;
+            ReservationResource createdResource = _resourceHelper.CreateNewReservationResource(reservationId, request.Parameters.ReservationAmount, updatedEvent);
 
             return createdResource;
         }

@@ -7,6 +7,7 @@ using MediatR;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using attuned_events_api.Helpers;
 
 namespace attuned_events_api.Services
 {
@@ -23,7 +24,7 @@ namespace attuned_events_api.Services
         private readonly IMongoCollection<Reservation> _reservationCollection;
         private readonly IMongoDatabase db;
         private readonly MongoClient _client;
-        private readonly Mapper _autoMapper;
+        private readonly ReservationResourceHelper _resourceHelper;
 
         public UpdateEventReservationRequestHandler(IOptions<DBSettings> dbSettings)
         {
@@ -31,7 +32,7 @@ namespace attuned_events_api.Services
             db = _client.GetDatabase(dbSettings.Value.DatabaseName);
             _eventCollection = db.GetCollection<Event>(MongoCollectionName.Events);
             _reservationCollection = db.GetCollection<Reservation>(MongoCollectionName.Reservations);
-            _autoMapper = AutoMapperConfig.InitializeAutoMapper();
+            _resourceHelper = new ReservationResourceHelper();
         }
 
         public async Task<ReservationResource> Handle(UpdateEventReservationRequest request, CancellationToken cancellationToken)
@@ -40,46 +41,24 @@ namespace attuned_events_api.Services
 
             if (hostedEvent is null)
             {
-                ReservationResource error = new ReservationResource()
-                {
-                    Message = "Unable to update reservation for the event."
-                };
-
-                error.Cause = "Event does not exist.";
-                error.ReservationAmount = request.Parameters.ReservationAmount;
-
-                return await Task.Run(() => error);
+                ReservationResource error = _resourceHelper.CreateEventDoesNotExistResource();
+                return error;
             }
-
-            EventResource resource = _autoMapper.Map<EventResource>(hostedEvent);
 
             if (request.Parameters.ReservationAmount <= 0)
             {
-                ReservationResource error = new ReservationResource()
-                {
-                    Message = "Unable to update reservation for the event."
-                };
+                ReservationResource error = _resourceHelper.CreateReservationAmountIsZeroOrNegativeResource(hostedEvent, request.Parameters.ReservationAmount);
 
-                error.Event = resource;
-                error.Cause = "Cannot update reservation having an amount of 0 or less.";
-                error.ReservationAmount = request.Parameters.ReservationAmount;
-
-                return await Task.Run(() => error);
+                return error;
             }
 
             Reservation currentReservation = await _reservationCollection.Find(Builders<Reservation>.Filter.Eq(e => e.ReservationId, request.ReservationId)).FirstOrDefaultAsync();
 
             if (currentReservation is null)
             {
-                ReservationResource error = new ReservationResource()
-                {
-                    Message = "Unable to update reservation for the event."
-                };
+                ReservationResource error = _resourceHelper.CreateReservationDoesNotExistResource();
 
-                error.Cause = "Reservation does not exist.";
-                error.ReservationAmount = request.Parameters.ReservationAmount;
-
-                return await Task.Run(() => error);
+                return error;
             }
 
             Reservation reservation = new Reservation()
@@ -92,29 +71,16 @@ namespace attuned_events_api.Services
 
             if (amountToChange > hostedEvent.Availability)
             {
-                ReservationResource error = new ReservationResource()
-                {
-                    Message = "Unable to update reservation for the event."
-                };
+                ReservationResource error = _resourceHelper.CreateReservationAmountExceedsResource(hostedEvent, request.Parameters.ReservationAmount);
 
-                error.Event = resource;
-                error.Cause = "The amount of reservations exceed the amount of tickets available.";
-                error.ReservationAmount = request.Parameters.ReservationAmount;
-
-                return await Task.Run(() => error);
+                return error;
             }
 
             if (request.Parameters.ReservationAmount == currentReservation.ReservationAmount)
             {
-                ReservationResource error = new ReservationResource()
-                {
-                    Message = "Unable to update reservation for the event."
-                };
+                ReservationResource error = _resourceHelper.CreateReservationAmountNoChangeResource(request.Parameters.ReservationAmount);
 
-                error.Cause = "Reservation amount has no change or difference.";
-                error.ReservationAmount = request.Parameters.ReservationAmount;
-
-                return await Task.Run(() => error);
+                return error;
             }
 
             await _eventCollection.UpdateOneAsync(
@@ -127,16 +93,9 @@ namespace attuned_events_api.Services
 
             Event updatedEvent = await _eventCollection.Find(Builders<Event>.Filter.Eq(e => e.EventId, request.EventId)).FirstOrDefaultAsync();
 
-            ReservationResource createdResource = new ReservationResource()
-            {
-                Event = _autoMapper.Map<EventResource>(updatedEvent),
-                Message = "Event reservation successfully updated."
-            };
+            ReservationResource updatedResource = _resourceHelper.CreateReservationUpdatedResource(request.ReservationId, request.Parameters.ReservationAmount, updatedEvent);
 
-            createdResource.ReservationId = request.ReservationId.ToString();
-            createdResource.ReservationAmount = request.Parameters.ReservationAmount;
-
-            return createdResource;
+            return updatedResource;
         }
     }
 }
